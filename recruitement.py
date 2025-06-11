@@ -9,6 +9,9 @@ import time
 from util.llm_factory import LLMFactory
 import io
 import fitz  
+import psycopg2
+from dotenv import load_dotenv
+load_dotenv()
 def pdf_extractor(file_path: str) -> str:
     print("[INFO] Converting PDF to text...")
 
@@ -22,7 +25,57 @@ def pdf_extractor(file_path: str) -> str:
     safe_text = ''.join([c if ord(c) < 128 or c in '\n\r\t' else '' for c in text])
     return safe_text
 
-
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
+DB_NAME = os.getenv("DB_NAME")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+def get_db_connection():
+    """Establishes and returns a database connection."""
+    if not all([DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD]):
+        raise ValueError("Database environment variables are not fully set.")
+    try:
+        conn = psycopg2.connect(
+            host=DB_HOST,
+            port=DB_PORT,
+            dbname=DB_NAME,
+            user=DB_USER,
+            password=DB_PASSWORD
+        )
+        return conn
+    except psycopg2.OperationalError as e:
+        print(f"Error connecting to database: {e}")
+        raise
+def initialize_db_schema():
+    """Creates the candidates table if it doesn't exist. Removed UNIQUE constraint on email."""
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # This will now create the table correctly since the old one is gone.
+        # Notice recipient_email is just TEXT NOT NULL.
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS recruitement (
+                id SERIAL PRIMARY KEY,
+                file_path TEXT,
+                experience_level TEXT,
+                skill_match TEXT,
+                response TEXT,
+                recipient_email TEXT NOT NULL,
+                email_text TEXT,
+                name TEXT,
+                role TEXT
+            );
+        """)
+        conn.commit()
+        print("Database schema initialized successfully.")
+    except Exception as e:
+        print(f"Error initializing database schema: {e}")
+    finally:
+        if conn:
+            conn.close()
+initialize_db_schema()
 # Define the state structure
 class State(TypedDict):
     file_path: str
@@ -39,7 +92,48 @@ class State(TypedDict):
     message:str
     text:str
     name:str
-    role:str
+    role: str
+
+def store_data_in_db(state: State) -> State:
+    print("\n--- Storing Offer in DB and Sending Email ---")
+
+    try:
+        # Insert into recruitement table (no ON CONFLICT)
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO recruitement (
+                file_path, experience_level, skill_match, response, recipient_email, 
+                email_text, name, role
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id;
+            """,
+            (
+                state.get('file_path'),
+                state.get('experience_level'),
+                state.get('skill_match'),
+                state.get('response'),
+                state.get('recipient_email'),
+                state["text"],
+                state.get('name'),
+                state.get('role')
+            )
+        )
+        candidate_id = cur.fetchone()[0]
+        conn.commit()
+        db_insertion_status = f"Success (New Recruitement ID: {candidate_id})"
+        print(f"Recruitement Data stored in DB ID: {candidate_id}")
+        
+
+    except Exception as e:
+        print(f"Error storing offer in DB: {e}")
+        db_insertion_status = f"Failed: {e}"
+    finally:
+        if 'conn' in locals() and conn:
+            conn.close()
+    print("Data stored in db successfully !!")
+
 
 # Define nodes
 def categorize_experience(state: State) -> State:
@@ -119,6 +213,7 @@ def schedule_hr_interview(state: State) -> State:
     sub = data["sub"]
     message = data["message"]
     text=f"Subject: {sub}\n\n{message}"
+    state["text"]=text
     server=smtplib.SMTP('smtp.gmail.com', 587)
     server.starttls()
     server.login(state["send_email"],"aoxm hosj uenj vmrd")
@@ -128,6 +223,7 @@ def schedule_hr_interview(state: State) -> State:
         "file_path": state["file_path"],
         "experience_level": state["experience_level"],
         "skill_match": state["skill_match"],
+        "text":state["text"],
         "response": "Candidate has been shortlisted for an HR interview."
     }
 
@@ -181,6 +277,7 @@ def reject_application(state: State) -> State:
     sub = data["sub"]
     message = data["message"]
     text=f"Subject: {sub}\n\n{message}"
+    state["text"]=text
     server=smtplib.SMTP('smtp.gmail.com', 587)
     server.starttls()
     server.login(state["send_email"],"aoxm hosj uenj vmrd")
@@ -190,6 +287,7 @@ def reject_application(state: State) -> State:
         "file_path": state["file_path"],
         "experience_level": state["experience_level"],
         "skill_match": state["skill_match"],
+        "text":state["text"],
         "response": "Candidate doesn't meet JD and has been rejected."
     }
 
@@ -206,6 +304,7 @@ def graph_builder(state: State) -> State:
     print("[INFO] Building the Garbh workflow.")
     workflow = StateGraph(State)
     workflow.add_node("categorize_experience", categorize_experience)
+    workflow.add_node("store_data_in_db", store_data_in_db)
     workflow.add_node("assess_skillset", assess_skillset)
     workflow.add_node("email_details", email_details)
     workflow.add_node("schedule_hr_interview", schedule_hr_interview)
@@ -224,23 +323,25 @@ def graph_builder(state: State) -> State:
             "reject_application": "reject_application"
         }
     )
-    workflow.add_edge("schedule_hr_interview", END)
-    workflow.add_edge("escalate_to_recruiter", END)
-    workflow.add_edge("reject_application", END)
+    workflow.add_edge("schedule_hr_interview", "store_data_in_db")
+    workflow.add_edge("escalate_to_recruiter", "store_data_in_db")
+    workflow.add_edge("reject_application", "store_data_in_db")
+    workflow.add_edge("store_data_in_db", END)
     app = workflow.compile()
     return app
 graph=graph_builder(State)
+if __name__ == "__main__":
+    initialize_db_schema()
+    folder_path = "C:\\Users\\l43ar\\Downloads\\AgenticHR\\agentic_hr\\CVList"
 
-folder_path = "C:\\Users\\l43ar\\Downloads\\AgenticHR\\agentic_hr\\CVList"
+    # Loop through all files in the folder
+    for filename in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, filename)
 
-# Loop through all files in the folder
-for filename in os.listdir(folder_path):
-    file_path = os.path.join(folder_path, filename)
-
-    # Optionally skip directories or non-PDF files
-    if os.path.isfile(file_path) and filename.endswith(".pdf"):
-        data=graph.invoke({
-            "file_path": file_path
-        })
-    print(f"Resume {filename} processed successfully.\n")
-    time.sleep(5)
+        # Optionally skip directories or non-PDF files
+        if os.path.isfile(file_path) and filename.endswith(".pdf"):
+            data=graph.invoke({
+                "file_path": file_path
+            })
+        print(f"Resume {filename} processed successfully.\n")
+        time.sleep(5)
