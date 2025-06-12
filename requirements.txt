@@ -1,0 +1,11 @@
+langchain-mistralai                          # Integration of LangChain with MistralAI
+langchain-openai                             # Integration of LangChain with OpenAI
+langchain-ollama                             # Integration of LangChain with Ollama
+langchain-google-genai                       # Integration of LangChain with Google GenAI
+langchain-core                               # Core LangChain library
+langchain-community                          # Community contributions to LangChain
+python-dotenv                                # For loading environment variables from a .env file
+langgraph                                    # To run the Graph-Based AI Agent
+langsmith                                    # For LangSmith integration to trace the project
+markdown                                     # For rendering email body as markdown in the project
+psycopg2                                     # PostgreSQL adapter for Python
