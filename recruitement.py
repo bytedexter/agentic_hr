@@ -10,8 +10,10 @@ from util.llm_factory import LLMFactory
 import io
 import fitz  
 import psycopg2
+import shutil
 from dotenv import load_dotenv
 load_dotenv()
+
 def pdf_extractor(file_path: str) -> str:
     print("[INFO] Converting PDF to text...")
 
@@ -24,7 +26,8 @@ def pdf_extractor(file_path: str) -> str:
 
     safe_text = ''.join([c if ord(c) < 128 or c in '\n\r\t' else '' for c in text])
     return safe_text
-
+SENDER_EMAIL = os.getenv("SENDER_EMAIL")
+SENDER_APP_PASSWORD = os.getenv("SENDER_APP_PASSWORD")
 DB_HOST = os.getenv("DB_HOST")
 DB_PORT = os.getenv("DB_PORT")
 DB_NAME = os.getenv("DB_NAME")
@@ -65,7 +68,8 @@ def initialize_db_schema():
                 recipient_email TEXT NOT NULL,
                 email_text TEXT,
                 name TEXT,
-                role TEXT
+                role TEXT,
+                processed BOOLEAN DEFAULT FALSE
             );
         """)
         conn.commit()
@@ -86,6 +90,7 @@ class State(TypedDict):
     experience_level: str
     skill_match: str
     response: str
+    status:str
     send_email:str
     recipient_email:str
     sub:str
@@ -105,8 +110,8 @@ def store_data_in_db(state: State) -> State:
             """
             INSERT INTO recruitement (
                 file_path, experience_level, skill_match, response, recipient_email, 
-                email_text, name, role
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                email_text, name, role, processed
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s,%s)
             RETURNING id;
             """,
             (
@@ -117,14 +122,20 @@ def store_data_in_db(state: State) -> State:
                 state.get('recipient_email'),
                 state["text"],
                 state.get('name'),
-                state.get('role')
+                state.get('role'),
+                False
             )
         )
-        candidate_id = cur.fetchone()[0]
+        recruitement_id = cur.fetchone()[0]
         conn.commit()
-        db_insertion_status = f"Success (New Recruitement ID: {candidate_id})"
-        print(f"Recruitement Data stored in DB ID: {candidate_id}")
-        
+        db_insertion_status = f"Success (New Recruitement ID: {recruitement_id})"
+        print(f"Recruitement Data stored in DB ID: {recruitement_id}")
+        return {
+            "id": recruitement_id,
+            "name": state.get('name'),
+            "role": state.get('role'),
+            "recipient_email": state.get('recipient_email')
+        }
 
     except Exception as e:
         print(f"Error storing offer in DB: {e}")
@@ -148,7 +159,7 @@ def categorize_experience(state: State) -> State:
     experience_level = chain.invoke({"application": application}).content
     print(f"Experience Level: {experience_level}")
     return {
-        "file_path": file_path,
+        "file_path": state["file_path"],
         "experience_level": experience_level.strip()
     }
 
@@ -160,18 +171,15 @@ def email_details(state:State)->State:
         f"From the {application},extract the reciever email that is the mail id given in the resume and store it.Only return the email id as a single stirng nothing else.remove the \n and the name with it"
     )
     promptnew=ChatPromptTemplate.from_template(
-       f"Only return the name from the resume name of the candidate from the {application} and store it in name variable."
+       f"Only return the name of the candidate as given in the application {application}.And nothing else should be returned other than the name of the candidate."
     )
     chain=prompt | LLMFactory.create_llm_instance(temperature=0.2, local_llm=False,max_tokens=1000)
     chainnew=promptnew | LLMFactory.create_llm_instance(temperature=0.2, local_llm=False,max_tokens=1000)
-    sender_email="mukhopadhyayaritranptel7@gmail.com"
     recipient_email=chain.invoke({"application": application}).content
     name=chainnew.invoke({"application": application}).content
     print("Name of the Candidate:", name.strip())
-    print("Sender Email:", sender_email.strip())
     print("Receiver Email:", recipient_email.strip())
     return{
-        "send_email":sender_email.strip(),
         "recipient_email":recipient_email.strip(),
         "name":name.strip(),
     }
@@ -181,14 +189,17 @@ def assess_skillset(state: State) -> State:
     prompt = ChatPromptTemplate.from_template(
         "Based on the job application for a Python Developer, assess the candidate's skillset. "
         "Respond with either 'Match' or 'No Match'.\n\nApplication:\n{application}"
-        "The Role is SDE.Store it in the role variable."
+    )
+    promptnew = ChatPromptTemplate.from_template(
+        "Just return the role as SDE nothing else."
     )
     chain = prompt | LLMFactory.create_llm_instance(temperature=0.2, local_llm=False,max_tokens=1000)
+    chainnew = promptnew | LLMFactory.create_llm_instance(temperature=0.2, local_llm=False,max_tokens=1000)
     skill_match = chain.invoke({"application": application}).content
-    role=chain.invoke({"application": application}).content
+    role=chainnew.invoke({"application": application}).content
     print(f"Skill Match: {skill_match}")
     return {
-        "file_path": file_path,
+        "file_path": state["file_path"],
         "experience_level": state["experience_level"],
         "skill_match": skill_match.strip(),
         "role": role.strip()
@@ -216,14 +227,15 @@ def schedule_hr_interview(state: State) -> State:
     state["text"]=text
     server=smtplib.SMTP('smtp.gmail.com', 587)
     server.starttls()
-    server.login(state["send_email"],"aoxm hosj uenj vmrd")
-    server.sendmail(state["send_email"],state["recipient_email"],text)
+    server.login(SENDER_EMAIL,SENDER_APP_PASSWORD)
+    server.sendmail(SENDER_EMAIL,state["recipient_email"],text)
     print("Interview Scheduling Email Sent !!")
     return {
         "file_path": state["file_path"],
         "experience_level": state["experience_level"],
         "skill_match": state["skill_match"],
         "text":state["text"],
+        "status":"Accepted",
         "response": "Candidate has been shortlisted for an HR interview."
     }
 
@@ -248,13 +260,14 @@ def escalate_to_recruiter(state: State) -> State:
     text=f"Subject: {sub}\n\n{message}"
     server=smtplib.SMTP('smtp.gmail.com', 587)
     server.starttls()
-    server.login(state["send_email"],"aoxm hosj uenj vmrd")
-    server.sendmail(state["send_email"],state["recipient_email"],text)
+    server.login(SENDER_EMAIL,SENDER_APP_PASSWORD)
+    server.sendmail(SENDER_EMAIL,state["recipient_email"],text)
     print("Escalating Email Sent !!")
     return {
         "file_path": state["file_path"],
         "experience_level": state["experience_level"],
         "skill_match": state["skill_match"],
+        "status":"Escalated",
         "response": "Candidate has senior-level experience but doesn't match job skills."
     }
 
@@ -280,14 +293,15 @@ def reject_application(state: State) -> State:
     state["text"]=text
     server=smtplib.SMTP('smtp.gmail.com', 587)
     server.starttls()
-    server.login(state["send_email"],"aoxm hosj uenj vmrd")
-    server.sendmail(state["send_email"],state["recipient_email"],text)
+    server.login(SENDER_EMAIL,SENDER_APP_PASSWORD)
+    server.sendmail(SENDER_EMAIL,state["recipient_email"],text)
     print("Rejection Email Sent !!")
     return {
         "file_path": state["file_path"],
         "experience_level": state["experience_level"],
         "skill_match": state["skill_match"],
         "text":state["text"],
+        "status":"Rejected",
         "response": "Candidate doesn't meet JD and has been rejected."
     }
 
@@ -330,18 +344,21 @@ def graph_builder(state: State) -> State:
     app = workflow.compile()
     return app
 graph=graph_builder(State)
-if __name__ == "__main__":
-    initialize_db_schema()
-    folder_path = "C:\\Users\\l43ar\\Downloads\\AgenticHR\\agentic_hr\\CVList"
 
-    # Loop through all files in the folder
+def recruiter(state:State)->State:
+    initialize_db_schema()
+    folder_path="C:\\Users\\l43ar\\Downloads\\AgenticHR\\agentic_hr\\CVList"
+    processed_folder = os.path.join(folder_path, "processed")
+    os.makedirs(processed_folder, exist_ok=True)
+
     for filename in os.listdir(folder_path):
         file_path = os.path.join(folder_path, filename)
 
-        # Optionally skip directories or non-PDF files
         if os.path.isfile(file_path) and filename.endswith(".pdf"):
-            data=graph.invoke({
+            graph.invoke({
                 "file_path": file_path
             })
-        print(f"Resume {filename} processed successfully.\n")
-        time.sleep(5)
+            print(f"Resume {filename} processed successfully.\n")
+            shutil.move(file_path, os.path.join(processed_folder, filename))  # ✅ move file
+            time.sleep(5)
+recruiter(State)
