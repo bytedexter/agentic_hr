@@ -7,6 +7,7 @@ import smtplib
 import json
 import time
 from util.llm_factory import LLMFactory
+from util.system_prompt import prompt_categorize_experience,prompt_assess_skillset,prompt_assess_skillset_new,prompt_email_details,prompt_email_details_new,prompt_schedule_interview,prompt_escalate_to_recruiter,prompt_rejection
 import io
 import fitz  
 import psycopg2
@@ -150,11 +151,7 @@ def store_data_in_db(state: State) -> State:
 def categorize_experience(state: State) -> State:
     application = pdf_extractor(state["file_path"])
     print("\nCategorizing experience level:")
-    prompt = ChatPromptTemplate.from_template(
-        "Based on the following job application, categorize the candidate as 'Entry-level', 'Mid-level' or 'Senior-level'. "
-        "Anyone with experience of more than 7 years is considered 'Senior-level'. "
-        "Respond with one of: 'Entry-level', 'Mid-level', or 'Senior-level'.\n\nApplication:\n{application}"
-    )
+    prompt=ChatPromptTemplate.from_template(prompt_categorize_experience.format(application=application))
     chain = prompt | LLMFactory.create_llm_instance(temperature=0.2, local_llm=False,max_tokens=1000)
     experience_level = chain.invoke({"application": application}).content
     print(f"Experience Level: {experience_level}")
@@ -167,12 +164,8 @@ def categorize_experience(state: State) -> State:
 def email_details(state:State)->State:
     application = pdf_extractor(state["file_path"])
     print("This is used to extract all the necessary email details from the application")
-    prompt=ChatPromptTemplate.from_template(
-        f"From the {application},extract the reciever email that is the mail id given in the resume and store it.Only return the email id as a single stirng nothing else.remove the \n and the name with it"
-    )
-    promptnew=ChatPromptTemplate.from_template(
-       f"Only return the name of the candidate as given in the application {application}.And nothing else should be returned other than the name of the candidate."
-    )
+    prompt=ChatPromptTemplate.from_template(prompt_email_details.format(application=application))
+    promptnew=ChatPromptTemplate.from_template(prompt_email_details_new.format(application=application))
     chain=prompt | LLMFactory.create_llm_instance(temperature=0.2, local_llm=False,max_tokens=1000)
     chainnew=promptnew | LLMFactory.create_llm_instance(temperature=0.2, local_llm=False,max_tokens=1000)
     recipient_email=chain.invoke({"application": application}).content
@@ -186,13 +179,8 @@ def email_details(state:State)->State:
 
 def assess_skillset(state: State) -> State:
     application = pdf_extractor(state["file_path"])
-    prompt = ChatPromptTemplate.from_template(
-        "Based on the job application for a Python Developer, assess the candidate's skillset. "
-        "Respond with either 'Match' or 'No Match'.\n\nApplication:\n{application}"
-    )
-    promptnew = ChatPromptTemplate.from_template(
-        "Just return the role as SDE nothing else."
-    )
+    prompt=ChatPromptTemplate.from_template(prompt_assess_skillset.format(application=application))
+    promptnew = ChatPromptTemplate.from_template(prompt_assess_skillset_new.format(application=application))
     chain = prompt | LLMFactory.create_llm_instance(temperature=0.2, local_llm=False,max_tokens=1000)
     chainnew = promptnew | LLMFactory.create_llm_instance(temperature=0.2, local_llm=False,max_tokens=1000)
     skill_match = chain.invoke({"application": application}).content
@@ -208,11 +196,7 @@ def assess_skillset(state: State) -> State:
 def schedule_hr_interview(state: State) -> State:
     print("\n[INFO] Scheduling interview...")
     application = pdf_extractor(state["file_path"])
-    prompt=ChatPromptTemplate.from_template(
-        "Generate the email subject and body for Candidate has been shortlisted for an HR interview by extracting information regarding the candidate from the given application {application} "
-        "Save the email subject in sub and body in message."
-        "Give the output as a json with keys sub and message."
-    )
+    prompt=ChatPromptTemplate.from_template(prompt_schedule_interview.format(application=application))
     chain=prompt | LLMFactory.create_llm_instance(temperature=0.2, local_llm=False,max_tokens=1000)
     response = chain.invoke({"application": application}).content
     print("LLM response:", response)
@@ -242,11 +226,7 @@ def schedule_hr_interview(state: State) -> State:
 def escalate_to_recruiter(state: State) -> State:
     application = pdf_extractor(state["file_path"])
     print("[INFO] Escalating to recruiter.")
-    prompt=ChatPromptTemplate.from_template(
-        "Generate the email subject and body for Candidate has senior-level experience but doesn't match job skills so the conadidature is escalated to the recruiter by extracting information regarding the candidate from the given application {application} "
-        "Save the email subject in sub and body in message."
-        "Give the output as a json with keys sub and message."
-    )
+    prompt=ChatPromptTemplate.from_template(prompt_escalate_to_recruiter.format(application=application))
     chain=prompt | LLMFactory.create_llm_instance(temperature=0.2, local_llm=False,max_tokens=1000)
     response = chain.invoke({"application": application}).content
     print("LLM response:", response)
@@ -274,11 +254,7 @@ def escalate_to_recruiter(state: State) -> State:
 def reject_application(state: State) -> State:
     print("[INFO] Rejecting application.")
     application = pdf_extractor(state["file_path"])
-    prompt=ChatPromptTemplate.from_template(
-        "Generate the email subject and body for Candidate doesn't meet JD and has been rejected. by extracting information regarding the candidate from the given application {application} "
-        "Save the email subject in sub and body in message."
-        "Give the output as a json with keys sub and message."
-    )
+    prompt=ChatPromptTemplate.from_template(prompt_rejection.format(application=application))
     chain=prompt | LLMFactory.create_llm_instance(temperature=0.2, local_llm=False,max_tokens=1000)
     response = chain.invoke({"application": application}).content
     print("LLM response:", response)
