@@ -15,7 +15,6 @@ from datetime import datetime, timedelta
 
 # Load .env file
 load_dotenv()
-
 # --- Email Configuration ---
 SENDER_EMAIL = os.getenv("SENDER_EMAIL")
 SENDER_APP_PASSWORD = os.getenv("SENDER_APP_PASSWORD")
@@ -270,26 +269,69 @@ def graph_builder_function():
 
 onboarding_graph = graph_builder_function()
 
-# --- Main Execution Block (for testing offer generation) ---
-if __name__ == "__main__":
+def fetch_latest_recruitment_entry() -> Optional[OnboardingState]:
+    """
+    Fetch the latest unprocessed candidate from the recruitment table.
+    """
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+
+        # Only get rows not yet processed
+        cur.execute("""
+            SELECT id, name, role, recipient_email
+            FROM recruitment
+            WHERE processed = FALSE AND status = 'Accepted'
+            ORDER BY id DESC
+            LIMIT 1;
+        """)
+        row = cur.fetchone()
+
+        if not row:
+            print("✅ No unprocessed candidates found in recruitment table.")
+            return None
+
+        # Mark this row as processed immediately to prevent future reprocessing
+        cur.execute("""
+            UPDATE recruitment SET processed = TRUE WHERE id = %s;
+        """, (row["id"],))
+        conn.commit()
+
+        return {
+            "name": row["name"],
+            "role": row["role"],
+            "start_date": "October 1, 2025",  # Optional: infer or fetch from elsewhere
+            "recipient_email": row["recipient_email"],
+            "offer_letter_content": "",
+            "generated_token": None,
+            "db_insertion_status": "",
+            "email_sent_status": "",
+        }
+
+    except Exception as e:
+        print(f"❌ Error fetching latest unprocessed recruitment entry: {e}")
+        return None
+    finally:
+        if conn: conn.close()
+
+
+def onboarder(state: OnboardingState) -> OnboardingState:
     print("\n--- Initializing Database Schema (if needed) ---")
     initialize_db_schema()
 
-    print("\n--- Onboarding Process Initiated ---")
-    initial_state: OnboardingState = {
-        "name": input("Enter candidate's name: "),
-        "role": input("Enter candidate's role: "),
-        "start_date": input("Enter start date (e.g., 'October 1, 2025'): "),
-        "recipient_email": input("Enter recipient's email: "),
-        "offer_letter_content": "", "generated_token": None,
-        "db_insertion_status": "", "email_sent_status": "",
-    }
+    print("\n--- Fetching Latest Candidate from Recruitment Table ---")
+    initial_state = fetch_latest_recruitment_entry()
 
-    print("\nRunning the offer sending graph...")
-    final_state = onboarding_graph.invoke(initial_state)
+    if initial_state is None:
+        print("No candidate available to process.")
+    else:
+        print("\n🚀 Running the onboarding process...")
+        final_state = onboarding_graph.invoke(initial_state)
 
-    print("\n--- Offer Sending Process Complete ---")
-    print(f"DB Status: {final_state['db_insertion_status']}")
-    print(f"Email Status: {final_state['email_sent_status']}")
+        print("\n--- Onboarding Process Complete ---")
+        print(f"DB Status: {final_state['db_insertion_status']}")
+        print(f"Email Status: {final_state['email_sent_status']}")
 
-    os.system("streamlit run streamlit_app.py")
+        os.system("streamlit run streamlit_app.py")
+        
+onboarder(OnboardingState)

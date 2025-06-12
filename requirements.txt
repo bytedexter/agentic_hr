@@ -9,3 +9,5 @@ langgraph                                    # To run the Graph-Based AI Agent
 langsmith                                    # For LangSmith integration to trace the project
 markdown                                     # For rendering email body as markdown in the project
 psycopg2                                     # PostgreSQL adapter for Python
+pymupdf                                         # PyMuPDF for PDF processing
+streamlit                                    # For building the web interface

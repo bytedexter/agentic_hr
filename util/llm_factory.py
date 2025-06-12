@@ -62,7 +62,7 @@ class LLMFactory:
             )
 
     @staticmethod
-    def create_llm_instance(temperature=0.3, local_llm=False):
+    def create_llm_instance(temperature=0.3, local_llm=False, max_tokens=1000):
         """
         Creates and returns an instance of the appropriate LLM.
         """
@@ -85,7 +85,7 @@ class LLMFactory:
             )
         elif model_name == constants.gemini_llm:
             return ChatGoogleGenerativeAI(
-                api_key=api_key, model=model_name, temperature=temperature
+                api_key=api_key, model=model_name, temperature=temperature, max_tokens=max_tokens
             )
         else:
             raise ValueError(f"Unsupported model: {model_name}")
