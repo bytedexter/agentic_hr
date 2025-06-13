@@ -3,3 +3,4 @@ util/__pycache__
 uploaded_documents/
 __pycache__/
 CVList/
+*.png

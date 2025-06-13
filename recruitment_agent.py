@@ -7,14 +7,23 @@ import smtplib
 import json
 import time
 from util.llm_factory import LLMFactory
-from util.system_prompt import prompt_categorize_experience,prompt_assess_skillset,prompt_assess_skillset_new,prompt_email_details,prompt_email_details_new,prompt_schedule_interview,prompt_escalate_to_recruiter,prompt_rejection
+from util.system_prompt import (
+    prompt_categorize_experience,
+    prompt_assess_skillset,
+    prompt_assess_skillset_new,
+    prompt_email_details,
+    prompt_email_details_new,
+    prompt_schedule_interview,
+    prompt_escalate_to_recruiter,
+    prompt_rejection,
+)
 import io
-import fitz  
+import fitz
 import psycopg2
 import shutil
 from dotenv import load_dotenv
-load_dotenv()
 
+load_dotenv()
 
 
 def pdf_extractor(file_path: str) -> str:
@@ -27,7 +36,7 @@ def pdf_extractor(file_path: str) -> str:
     text = "\n".join([page.get_text() for page in pdf])
     pdf.close()
 
-    safe_text = ''.join([c if ord(c) < 128 or c in '\n\r\t' else '' for c in text])
+    safe_text = "".join([c if ord(c) < 128 or c in "\n\r\t" else "" for c in text])
     return safe_text
 
 
@@ -50,13 +59,12 @@ def get_db_connection():
             port=DB_PORT,
             dbname=DB_NAME,
             user=DB_USER,
-            password=DB_PASSWORD
+            password=DB_PASSWORD,
         )
         return conn
     except psycopg2.OperationalError as e:
         print(f"Error connecting to database: {e}")
         raise
-
 
 
 def initialize_db_schema():
@@ -65,10 +73,11 @@ def initialize_db_schema():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        
+
         # This will now create the table correctly since the old one is gone.
         # Notice recipient_email is just TEXT NOT NULL.
-        cur.execute("""
+        cur.execute(
+            """
             CREATE TABLE IF NOT EXISTS recruitment (
                 id SERIAL PRIMARY KEY,
                 file_path TEXT,
@@ -82,7 +91,8 @@ def initialize_db_schema():
                 processed BOOLEAN DEFAULT FALSE,
                 status TEXT DEFAULT 'Pending'
             );
-        """)
+        """
+        )
         conn.commit()
         print("Database schema initialized successfully.")
     except Exception as e:
@@ -91,8 +101,8 @@ def initialize_db_schema():
         if conn:
             conn.close()
 
-initialize_db_schema()
 
+initialize_db_schema()
 
 
 # Define the state structure
@@ -105,14 +115,15 @@ class State(TypedDict):
     experience_level: str
     skill_match: str
     response: str
-    status:str
-    send_email:str
-    recipient_email:str
-    sub:str
-    message:str
-    text:str
-    name:str
+    status: str
+    send_email: str
+    recipient_email: str
+    sub: str
+    message: str
+    text: str
+    name: str
     role: str
+
 
 def store_data_in_db(state: State) -> State:
     print("\n--- Storing Offer in DB and Sending Email ---")
@@ -130,17 +141,17 @@ def store_data_in_db(state: State) -> State:
             RETURNING id;
             """,
             (
-                state.get('file_path'),
-                state.get('experience_level'),
-                state.get('skill_match'),
-                state.get('response'),
-                state.get('recipient_email'),
+                state.get("file_path"),
+                state.get("experience_level"),
+                state.get("skill_match"),
+                state.get("response"),
+                state.get("recipient_email"),
                 state["text"],
-                state.get('name'),
-                state.get('role'),
+                state.get("name"),
+                state.get("role"),
                 False,
-                state.get('status')
-            )
+                state.get("status"),
+            ),
         )
         recruitment_id = cur.fetchone()[0]
         conn.commit()
@@ -148,17 +159,17 @@ def store_data_in_db(state: State) -> State:
         print(f"recruitment Data stored in DB ID: {recruitment_id}")
         return {
             "id": recruitment_id,
-            "name": state.get('name'),
-            "role": state.get('role'),
-            "recipient_email": state.get('recipient_email'),
-            "db_insertion_status": db_insertion_status
+            "name": state.get("name"),
+            "role": state.get("role"),
+            "recipient_email": state.get("recipient_email"),
+            "db_insertion_status": db_insertion_status,
         }
 
     except Exception as e:
         print(f"Error storing offer in DB: {e}")
         db_insertion_status = f"Failed: {e}"
     finally:
-        if 'conn' in locals() and conn:
+        if "conn" in locals() and conn:
             conn.close()
     print("Data stored in db successfully !!")
 
@@ -167,53 +178,81 @@ def store_data_in_db(state: State) -> State:
 def categorize_experience(state: State) -> State:
     application = pdf_extractor(state["file_path"])
     print("\nCategorizing experience level:")
-    prompt=ChatPromptTemplate.from_template(prompt_categorize_experience.format(application=application))
-    chain = prompt | LLMFactory.create_llm_instance(temperature=0.2, local_llm=False,max_tokens=1000)
+    prompt = ChatPromptTemplate.from_template(
+        prompt_categorize_experience.format(application=application)
+    )
+    chain = prompt | LLMFactory.create_llm_instance(
+        temperature=0.2, local_llm=False, max_tokens=1000
+    )
     experience_level = chain.invoke({"application": application}).content
     print(f"Experience Level: {experience_level}")
     return {
         "file_path": state["file_path"],
-        "experience_level": experience_level.strip()
+        "experience_level": experience_level.strip(),
     }
 
 
-def email_details(state:State)->State:
+def email_details(state: State) -> State:
     application = pdf_extractor(state["file_path"])
-    print("This is used to extract all the necessary email details from the application")
-    prompt=ChatPromptTemplate.from_template(prompt_email_details.format(application=application))
-    promptnew=ChatPromptTemplate.from_template(prompt_email_details_new.format(application=application))
-    chain=prompt | LLMFactory.create_llm_instance(temperature=0.2, local_llm=False,max_tokens=1000)
-    chainnew=promptnew | LLMFactory.create_llm_instance(temperature=0.2, local_llm=False,max_tokens=1000)
-    recipient_email=chain.invoke({"application": application}).content
-    name=chainnew.invoke({"application": application}).content
+    print(
+        "This is used to extract all the necessary email details from the application"
+    )
+    prompt = ChatPromptTemplate.from_template(
+        prompt_email_details.format(application=application)
+    )
+    promptnew = ChatPromptTemplate.from_template(
+        prompt_email_details_new.format(application=application)
+    )
+    chain = prompt | LLMFactory.create_llm_instance(
+        temperature=0.2, local_llm=False, max_tokens=1000
+    )
+    chainnew = promptnew | LLMFactory.create_llm_instance(
+        temperature=0.2, local_llm=False, max_tokens=1000
+    )
+    recipient_email = chain.invoke({"application": application}).content
+    name = chainnew.invoke({"application": application}).content
     print("Name of the Candidate:", name.strip())
     print("Receiver Email:", recipient_email.strip())
-    return{
-        "recipient_email":recipient_email.strip(),
-        "name":name.strip(),
+    return {
+        "recipient_email": recipient_email.strip(),
+        "name": name.strip(),
     }
+
 
 def assess_skillset(state: State) -> State:
     application = pdf_extractor(state["file_path"])
-    prompt=ChatPromptTemplate.from_template(prompt_assess_skillset.format(application=application))
-    promptnew = ChatPromptTemplate.from_template(prompt_assess_skillset_new.format(application=application))
-    chain = prompt | LLMFactory.create_llm_instance(temperature=0.2, local_llm=False,max_tokens=1000)
-    chainnew = promptnew | LLMFactory.create_llm_instance(temperature=0.2, local_llm=False,max_tokens=1000)
+    prompt = ChatPromptTemplate.from_template(
+        prompt_assess_skillset.format(application=application)
+    )
+    promptnew = ChatPromptTemplate.from_template(
+        prompt_assess_skillset_new.format(application=application)
+    )
+    chain = prompt | LLMFactory.create_llm_instance(
+        temperature=0.2, local_llm=False, max_tokens=1000
+    )
+    chainnew = promptnew | LLMFactory.create_llm_instance(
+        temperature=0.2, local_llm=False, max_tokens=1000
+    )
     skill_match = chain.invoke({"application": application}).content
-    role=chainnew.invoke({"application": application}).content
+    role = chainnew.invoke({"application": application}).content
     print(f"Skill Match: {skill_match}")
     return {
         "file_path": state["file_path"],
         "experience_level": state["experience_level"],
         "skill_match": skill_match.strip(),
-        "role": role.strip()
+        "role": role.strip(),
     }
+
 
 def schedule_hr_interview(state: State) -> State:
     print("\n[INFO] Scheduling interview...")
     application = pdf_extractor(state["file_path"])
-    prompt=ChatPromptTemplate.from_template(prompt_schedule_interview.format(application=application))
-    chain=prompt | LLMFactory.create_llm_instance(temperature=0.2, local_llm=False,max_tokens=1000)
+    prompt = ChatPromptTemplate.from_template(
+        prompt_schedule_interview.format(application=application)
+    )
+    chain = prompt | LLMFactory.create_llm_instance(
+        temperature=0.2, local_llm=False, max_tokens=1000
+    )
     response = chain.invoke({"application": application}).content
     print("LLM response:", response)
     cleaned_response = response.strip().strip("```").replace("json", "", 1).strip()
@@ -223,27 +262,32 @@ def schedule_hr_interview(state: State) -> State:
     # Extract the fields
     sub = data["sub"]
     message = data["message"]
-    text=f"Subject: {sub}\n\n{message}"
-    state["text"]=text
-    server=smtplib.SMTP('smtp.gmail.com', 587)
+    text = f"Subject: {sub}\n\n{message}"
+    state["text"] = text
+    server = smtplib.SMTP("smtp.gmail.com", 587)
     server.starttls()
-    server.login(SENDER_EMAIL,SENDER_APP_PASSWORD)
-    server.sendmail(SENDER_EMAIL,state["recipient_email"],text)
+    server.login(SENDER_EMAIL, SENDER_APP_PASSWORD)
+    server.sendmail(SENDER_EMAIL, state["recipient_email"], text)
     print("Interview Scheduling Email Sent !!")
     return {
         "file_path": state["file_path"],
         "experience_level": state["experience_level"],
         "skill_match": state["skill_match"],
-        "text":state["text"],
-        "status":"Accepted",
-        "response": "Candidate has been shortlisted for an HR interview."
+        "text": state["text"],
+        "status": "Accepted",
+        "response": "Candidate has been shortlisted for an HR interview.",
     }
+
 
 def escalate_to_recruiter(state: State) -> State:
     application = pdf_extractor(state["file_path"])
     print("[INFO] Escalating to recruiter.")
-    prompt=ChatPromptTemplate.from_template(prompt_escalate_to_recruiter.format(application=application))
-    chain=prompt | LLMFactory.create_llm_instance(temperature=0.2, local_llm=False,max_tokens=1000)
+    prompt = ChatPromptTemplate.from_template(
+        prompt_escalate_to_recruiter.format(application=application)
+    )
+    chain = prompt | LLMFactory.create_llm_instance(
+        temperature=0.2, local_llm=False, max_tokens=1000
+    )
     response = chain.invoke({"application": application}).content
     print("LLM response:", response)
     cleaned_response = response.strip().strip("```").replace("json", "", 1).strip()
@@ -253,25 +297,30 @@ def escalate_to_recruiter(state: State) -> State:
     # Extract the fields
     sub = data["sub"]
     message = data["message"]
-    text=f"Subject: {sub}\n\n{message}"
-    server=smtplib.SMTP('smtp.gmail.com', 587)
+    text = f"Subject: {sub}\n\n{message}"
+    server = smtplib.SMTP("smtp.gmail.com", 587)
     server.starttls()
-    server.login(SENDER_EMAIL,SENDER_APP_PASSWORD)
-    server.sendmail(SENDER_EMAIL,state["recipient_email"],text)
+    server.login(SENDER_EMAIL, SENDER_APP_PASSWORD)
+    server.sendmail(SENDER_EMAIL, state["recipient_email"], text)
     print("Escalating Email Sent !!")
     return {
         "file_path": state["file_path"],
         "experience_level": state["experience_level"],
         "skill_match": state["skill_match"],
-        "status":"Escalated",
-        "response": "Candidate has senior-level experience but doesn't match job skills."
+        "status": "Escalated",
+        "response": "Candidate has senior-level experience but doesn't match job skills.",
     }
+
 
 def reject_application(state: State) -> State:
     print("[INFO] Rejecting application.")
     application = pdf_extractor(state["file_path"])
-    prompt=ChatPromptTemplate.from_template(prompt_rejection.format(application=application))
-    chain=prompt | LLMFactory.create_llm_instance(temperature=0.2, local_llm=False,max_tokens=1000)
+    prompt = ChatPromptTemplate.from_template(
+        prompt_rejection.format(application=application)
+    )
+    chain = prompt | LLMFactory.create_llm_instance(
+        temperature=0.2, local_llm=False, max_tokens=1000
+    )
     response = chain.invoke({"application": application}).content
     print("LLM response:", response)
     cleaned_response = response.strip().strip("```").replace("json", "", 1).strip()
@@ -281,21 +330,22 @@ def reject_application(state: State) -> State:
     # Extract the fields
     sub = data["sub"]
     message = data["message"]
-    text=f"Subject: {sub}\n\n{message}"
-    state["text"]=text
-    server=smtplib.SMTP('smtp.gmail.com', 587)
+    text = f"Subject: {sub}\n\n{message}"
+    state["text"] = text
+    server = smtplib.SMTP("smtp.gmail.com", 587)
     server.starttls()
-    server.login(SENDER_EMAIL,SENDER_APP_PASSWORD)
-    server.sendmail(SENDER_EMAIL,state["recipient_email"],text)
+    server.login(SENDER_EMAIL, SENDER_APP_PASSWORD)
+    server.sendmail(SENDER_EMAIL, state["recipient_email"], text)
     print("Rejection Email Sent !!")
     return {
         "file_path": state["file_path"],
         "experience_level": state["experience_level"],
         "skill_match": state["skill_match"],
-        "text":state["text"],
-        "status":"Rejected",
-        "response": "Candidate doesn't meet JD and has been rejected."
+        "text": state["text"],
+        "status": "Rejected",
+        "response": "Candidate doesn't meet JD and has been rejected.",
     }
+
 
 # Routing logic
 def route_app(state: State) -> str:
@@ -305,6 +355,7 @@ def route_app(state: State) -> str:
         return "escalate_to_recruiter"
     else:
         return "reject_application"
+
 
 def graph_builder(state: State) -> State:
     print("[INFO] Building the Graph workflow.")
@@ -326,20 +377,37 @@ def graph_builder(state: State) -> State:
         {
             "schedule_hr_interview": "schedule_hr_interview",
             "escalate_to_recruiter": "escalate_to_recruiter",
-            "reject_application": "reject_application"
-        }
+            "reject_application": "reject_application",
+        },
     )
     workflow.add_edge("schedule_hr_interview", "store_data_in_db")
     workflow.add_edge("escalate_to_recruiter", "store_data_in_db")
     workflow.add_edge("reject_application", "store_data_in_db")
     workflow.add_edge("store_data_in_db", END)
     app = workflow.compile()
+
+    from langchain_core.runnables.graph_mermaid import draw_mermaid_png
+
+    mermaid_str = app.get_graph().draw_mermaid()
+    png_bytes = draw_mermaid_png(
+        mermaid_syntax=mermaid_str,
+        output_file_path="recruit.png",  # Path where PNG will be saved
+        background_color="white",  # Optional: change as needed
+        padding=20,  # Optional padding
+    )
+
     return app
-graph=graph_builder(State)
+
+
+graph = graph_builder(State)
+
 
 def recruiter(state: State) -> list:
     initialize_db_schema()
-    folder_path = "D:\\Projects\\AIML\\AI agenting\\Langchain&Langgraph\\agentic_hr\\CVList"
+    folder_path = (
+        "D:\\Projects\\AIML\\AI agenting\\Langchain&Langgraph\\agentic_hr\\CVList"
+        # "//media//trycatchraunak//My Works//Projects//AIML//AI agenting//Langchain&Langgraph//agentic_hr//CVList"
+    )
     processed_folder = os.path.join(folder_path, "processed")
     os.makedirs(processed_folder, exist_ok=True)
 

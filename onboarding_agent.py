@@ -7,7 +7,10 @@ from dotenv import load_dotenv
 from langgraph.graph import StateGraph, END
 from langsmith import traceable
 from util.llm_factory import LLMFactory
-from util.system_prompt import generate_offer_letter_prompt, onboarding_completion_success_email_and_first_day_orientation_prompt
+from util.system_prompt import (
+    generate_offer_letter_prompt,
+    onboarding_completion_success_email_and_first_day_orientation_prompt,
+)
 import markdown
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -31,6 +34,7 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 # --- Streamlit Application URL ---
 STREAMLIT_APP_BASE_URL = os.getenv("STREAMLIT_APP_BASE_URL")
 
+
 # --- Database Connection Helper ---
 def get_db_connection():
     """Establishes and returns a database connection."""
@@ -42,12 +46,13 @@ def get_db_connection():
             port=DB_PORT,
             dbname=DB_NAME,
             user=DB_USER,
-            password=DB_PASSWORD
+            password=DB_PASSWORD,
         )
         return conn
     except psycopg2.OperationalError as e:
         print(f"Error connecting to database: {e}")
         raise
+
 
 # --- Initialize Database Schema ---
 def initialize_db_schema():
@@ -56,10 +61,11 @@ def initialize_db_schema():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        
+
         # This will now create the table correctly since the old one is gone.
         # Notice recipient_email is just TEXT NOT NULL.
-        cur.execute("""
+        cur.execute(
+            """
             CREATE TABLE IF NOT EXISTS candidates (
                 id SERIAL PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -78,7 +84,8 @@ def initialize_db_schema():
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
-        """)
+        """
+        )
         conn.commit()
         print("Database schema initialized successfully.")
     except Exception as e:
@@ -86,6 +93,7 @@ def initialize_db_schema():
     finally:
         if conn:
             conn.close()
+
 
 # --- LangGraph State ---
 class OnboardingState(TypedDict):
@@ -98,20 +106,16 @@ class OnboardingState(TypedDict):
     db_insertion_status: str
     email_sent_status: str
 
+
 # --- LangGraph Nodes ---
 @traceable(name="Generate Offer Letter")
 def generate_offer_letter(state: OnboardingState) -> OnboardingState:
     print("\n--- Generating Offer Letter ---")
     prompt = generate_offer_letter_prompt.format(
-        name=state['name'],
-        role=state['role'],
-        start_date=state['start_date']
+        name=state["name"], role=state["role"], start_date=state["start_date"]
     )
     response_message = LLMFactory.invoke(
-        system_prompt=prompt,
-        human_message=prompt,
-        temperature=0.3,
-        local_llm=False
+        system_prompt=prompt, human_message=prompt, temperature=0.3, local_llm=False
     )
     offer_text = response_message.content
     print("Offer Letter Generated.")
@@ -138,8 +142,16 @@ def store_offer_in_db_and_send_email(state: OnboardingState) -> OnboardingState:
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id;
             """,
-            (state['name'], state['role'], state['start_date'], state['recipient_email'], 
-             state['offer_letter_content'], generated_token, token_expiry, 'Sent')
+            (
+                state["name"],
+                state["role"],
+                state["start_date"],
+                state["recipient_email"],
+                state["offer_letter_content"],
+                generated_token,
+                token_expiry,
+                "Sent",
+            ),
         )
         candidate_id = cur.fetchone()[0]
         conn.commit()
@@ -160,35 +172,47 @@ def store_offer_in_db_and_send_email(state: OnboardingState) -> OnboardingState:
         msg = MIMEText(email_body_html, "html")
         msg["Subject"] = f"Your Job Offer from Our Company - {state['role']}"
         msg["From"] = SENDER_EMAIL
-        msg["To"] = state['recipient_email']
+        msg["To"] = state["recipient_email"]
 
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.starttls()
             server.login(SENDER_EMAIL, SENDER_APP_PASSWORD)
             server.send_message(msg)
-        
+
         email_sent_status = "Success"
         print(f"Offer letter email sent successfully to {state['recipient_email']}.")
 
+        return {
+            **state,
+            "generated_token": generated_token,
+            "db_insertion_status": db_insertion_status,
+            "email_sent_status": email_sent_status,
+        }
+
     except (psycopg2.Error, ValueError) as db_err:
-        if 'conn' in locals() and conn: conn.rollback()
+        if "conn" in locals() and conn:
+            conn.rollback()
         db_insertion_status = f"DB/Config Error: {db_err}"
         print(f"Failed to process: {db_err}")
     except Exception as e:
         email_sent_status = f"Email Error: {e}"
         print(f"Failed to send email: {e}")
     finally:
-        if 'cur' in locals(): cur.close()
-        if 'conn' in locals() and conn: conn.close()
+        if "cur" in locals():
+            cur.close()
+        if "conn" in locals() and conn:
+            conn.close()
 
-    return {
-        **state,
-        "generated_token": generated_token,
-        "db_insertion_status": db_insertion_status,
-        "email_sent_status": email_sent_status,
-    }
+    # return {
+    #     **state,
+    #     "generated_token": generated_token,
+    #     "db_insertion_status": db_insertion_status,
+    #     "email_sent_status": email_sent_status,
+    # }
+
 
 # --- NEW FUNCTION (Called by Streamlit after document upload) ---
+
 
 @traceable(name="Generate and Send Completion Email")
 def generate_and_send_completion_email(candidate_id: int) -> Optional[str]:
@@ -202,21 +226,22 @@ def generate_and_send_completion_email(candidate_id: int) -> Optional[str]:
         # 1. Fetch candidate details
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute("SELECT name, role, recipient_email FROM candidates WHERE id = %s", (candidate_id,))
+        cur.execute(
+            "SELECT name, role, recipient_email FROM candidates WHERE id = %s",
+            (candidate_id,),
+        )
         candidate = cur.fetchone()
         if not candidate:
             raise ValueError(f"No candidate found with ID {candidate_id}")
 
         # 2. Generate content with Gemini LLM
-        prompt = onboarding_completion_success_email_and_first_day_orientation_prompt.format(
-            name=candidate['name'],
-            role=candidate['role']
+        prompt = (
+            onboarding_completion_success_email_and_first_day_orientation_prompt.format(
+                name=candidate["name"], role=candidate["role"]
+            )
         )
         response_message = LLMFactory.invoke(
-            system_prompt=prompt,
-            human_message=prompt,
-            temperature=0.3,
-            local_llm=False
+            system_prompt=prompt, human_message=prompt, temperature=0.3, local_llm=False
         )
         completion_content = response_message.content
         print("Completion content generated by LLM.")
@@ -229,7 +254,7 @@ def generate_and_send_completion_email(candidate_id: int) -> Optional[str]:
         msg = MIMEText(email_body_html, "html")
         msg["Subject"] = "Welcome Aboard! Your First Day at Our Company"
         msg["From"] = SENDER_EMAIL
-        msg["To"] = candidate['recipient_email']
+        msg["To"] = candidate["recipient_email"]
 
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
             server.starttls()
@@ -240,7 +265,7 @@ def generate_and_send_completion_email(candidate_id: int) -> Optional[str]:
         # 4. Update database status
         cur.execute(
             "UPDATE candidates SET orientation_email_status = 'Sent', updated_at = CURRENT_TIMESTAMP WHERE id = %s",
-            (candidate_id,)
+            (candidate_id,),
         )
         conn.commit()
         print(f"Database status updated for candidate ID: {candidate_id}.")
@@ -249,10 +274,12 @@ def generate_and_send_completion_email(candidate_id: int) -> Optional[str]:
 
     except Exception as e:
         print(f"ERROR in completion email process: {e}")
-        if conn: conn.rollback()
+        if conn:
+            conn.rollback()
         return None
     finally:
-        if conn: conn.close()
+        if conn:
+            conn.close()
 
 
 # --- LangGraph Definition ---
@@ -265,9 +292,21 @@ def graph_builder_function():
     graph_builder.add_edge("DbStoreAndEmailSender", END)
     graph = graph_builder.compile()
 
+    from langchain_core.runnables.graph_mermaid import draw_mermaid_png
+
+    mermaid_str = graph.get_graph().draw_mermaid()
+    png_bytes = draw_mermaid_png(
+        mermaid_syntax=mermaid_str,
+        output_file_path="onboard.png",  # Path where PNG will be saved
+        background_color="white",  # Optional: change as needed
+        padding=20,  # Optional padding
+    )
+
     return graph
 
+
 onboarding_graph = graph_builder_function()
+
 
 def fetch_latest_recruitment_entry() -> Optional[OnboardingState]:
     """
@@ -278,13 +317,15 @@ def fetch_latest_recruitment_entry() -> Optional[OnboardingState]:
         cur = conn.cursor(cursor_factory=RealDictCursor)
 
         # Only get rows not yet processed
-        cur.execute("""
+        cur.execute(
+            """
             SELECT id, name, role, recipient_email
             FROM recruitment
             WHERE processed = FALSE AND status = 'Accepted'
             ORDER BY id DESC
             LIMIT 1;
-        """)
+        """
+        )
         row = cur.fetchone()
 
         if not row:
@@ -292,9 +333,12 @@ def fetch_latest_recruitment_entry() -> Optional[OnboardingState]:
             return None
 
         # Mark this row as processed immediately to prevent future reprocessing
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE recruitment SET processed = TRUE WHERE id = %s;
-        """, (row["id"],))
+        """,
+            (row["id"],),
+        )
         conn.commit()
 
         return {
@@ -312,7 +356,8 @@ def fetch_latest_recruitment_entry() -> Optional[OnboardingState]:
         print(f"❌ Error fetching latest unprocessed recruitment entry: {e}")
         return None
     finally:
-        if conn: conn.close()
+        if conn:
+            conn.close()
 
 
 def onboarder(state: OnboardingState) -> OnboardingState:
@@ -333,5 +378,6 @@ def onboarder(state: OnboardingState) -> OnboardingState:
         print(f"Email Status: {final_state['email_sent_status']}")
 
         os.system("streamlit run streamlit_app.py")
-        
+
+
 onboarder(OnboardingState)
