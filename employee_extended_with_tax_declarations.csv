@@ -1,0 +1,6 @@
+Employee ID,Name,Email ID,Department,Designation,Date of Joining,PAN No,Bank Account No,UAN No,Base Salary,Days Present,Leaves Taken,House Rent Allowance,Special Allowance,Leave Travel Allowance,Bonus/Ex-gratia,PF-Contribution(in %),Variable Pay,Performance
+101,Alice,koyelisha7@gmail.com,HR,HR Executive,12-Jan-21,BPTPK1234F,5.02E+11,1.01E+11,40000,21,1,12%,7000,1250,1500,12%,10000,4
+102,Chittaranjan Khan,chittaranjankhan1975@gmail.com,Engineering,Software Engineer,01-Jul-22,ASHRE6789J,3.19E+11,1.01E+11,60000,22,0,12%,11000,2100,1500,12%,10000,5
+103,Bob,dpbasak2004@gmail.com,Marketing,Marketing Associate,18-Sep-20,MJKPL4567D,6.25E+11,1.02E+11,50000,20,2,12%,10000,2000,1500,12%,10000,4.5
+104,Monalisha Khan,monalishamadam1996@gmail.com,Sales,Sales Manager,23-Feb-19,RQWAB9832L,7.89E+11,1.02E+11,45000,19,3,12%,15000,2500,1500,12%,10000,3
+105,Koyel Khan,koyelkhan866@gmail.com,Finance,Finance Analyst,05-May-23,GHYTS3456K,1.10E+11,1.02E+11,55000,21,1,12%,18000,1000,1500,12%,10000,3.8
