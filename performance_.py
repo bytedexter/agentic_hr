@@ -1,6 +1,5 @@
 from typing import TypedDict, List, Union
 from langchain_core.messages import HumanMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import StateGraph, END
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
