@@ -16,6 +16,7 @@ class GenerateContentRequest(BaseModel):
     skills_and_competencies: str = Field(..., description="The required technical and soft skills, as well as core competencies needed for success in the role. (Mandatory)")
     our_company: str | None = Field(None, description="The company's website URL; system will fetch relevant company details. (Optional)")
     our_culture: str | None = Field(None, description="The company's website URL; system will fetch relevant information about the company's culture. (Optional)")
+    local_llm: bool | None = Field(default=None, description="Indicates whether to use a local LLM for content generation. (Optional)")
 
     @field_validator("job_title", "location", "reporting_relationship", "function", "role_overview", "key_responsibilities", "qualifications", "skills_and_competencies")
     def validate_mandatory_fields(cls, value: str, info) -> str:

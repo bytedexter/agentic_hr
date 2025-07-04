@@ -13,6 +13,7 @@ def generate_job_description(
     key_responsibilities: str,
     qualifications: str,
     skills_and_competencies: str,
+    local_llm: Optional[bool] = None,
     our_company: Optional[str] = None,
     our_culture: Optional[str] = None,
 ) -> Optional[str]:
