@@ -1,4 +1,4 @@
-from util.llm_factory import LLMFactory
+from .util.llm_factory import LLMFactory
 from langchain.prompts import ChatPromptTemplate
 from concurrent.futures import ThreadPoolExecutor
 import json
