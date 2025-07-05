@@ -13,10 +13,18 @@ Final output must follow the exact same schema and include all valid points. Mer
 """
 
 def scan_job_description(jd: str, count: int, config_path: str) -> dict:
-    config_file = os.path.join(os.path.dirname(__file__), '..', 'config', 'jd_output_format.json')
-    with open(config_file) as f:
+    # Use the provided config_path, fallback to default if None
+    if not config_path:
+        config_path = os.path.join(
+            os.path.dirname(__file__),
+            '..',
+            'config',
+            'jd_output_format.json'
+        )
+    
+    with open(config_path, 'r') as f:
         format_schema = f.read()
-
+    # …rest of function…
     reflections = invoke_llm_parallel(jd, format_schema, count)
 
     aggregation_prompt = AGG_PROMPT.format(reflected_outputs=json.dumps(reflections, indent=2))

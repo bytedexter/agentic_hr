@@ -12,12 +12,20 @@ Final output must follow the exact same schema and include all valid points. Mer
 """
 
 def scan_job_description(jd: str, count: int, config_path: str) -> dict:
-    with open(config_path) as f:
-        format_schema = f.read()
+    try:
+        with open(config_path, 'r') as f:
+            format_schema = f.read()
+    except FileNotFoundError:
+        raise ValueError(f"Configuration file not found: {config_path}")
+    except Exception as e:
+        raise ValueError(f"Error reading configuration file: {e}")
 
     reflections = invoke_llm_parallel(jd, format_schema, count)
 
     aggregation_prompt = AGG_PROMPT.format(reflected_outputs=json.dumps(reflections, indent=2))
     final_result = llm.invoke(aggregation_prompt)
 
-    return json.loads(final_result.content)
+    try:
+        return json.loads(final_result.content)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Failed to parse LLM response as JSON: {e}")
