@@ -14,17 +14,13 @@ Final output must follow the exact same schema and include all valid points. Mer
 
 def scan_job_description(jd: str, count: int, config_path: str) -> dict:
     # Use the provided config_path, fallback to default if None
-    if not config_path:
-        config_path = os.path.join(
-            os.path.dirname(__file__),
-            '..',
-            'config',
-            'jd_output_format.json'
-        )
-    
-    with open(config_path, 'r') as f:
-        format_schema = f.read()
-    # …rest of function…
+    try:
+        with open(config_path, 'r') as f:
+            format_schema = f.read()
+    except FileNotFoundError:
+        raise ValueError(f"Configuration file not found: {config_path}")
+    except Exception as e:
+        raise ValueError(f"Error reading configuration file: {e}")
     reflections = invoke_llm_parallel(jd, format_schema, count)
 
     aggregation_prompt = AGG_PROMPT.format(reflected_outputs=json.dumps(reflections, indent=2))
