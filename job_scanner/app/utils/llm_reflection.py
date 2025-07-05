@@ -1,3 +1,4 @@
+import re
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
@@ -9,16 +10,18 @@ import json
 llm = LLMFactory.create_llm_instance(temperature=0.2, local_llm=False)
 
 BASE_PROMPT = """
-You are an expert HR Analyst. Given the following Job Description, extract structured insights based on predefined categories.
+You are an expert HR Analyst. Your job is to extract structured data from the job description below using the format shown.
+
+Do not return any explanations, comments, or schema definitions. Respond ONLY with a valid JSON object that fills in the structure.
 
 Job Description:
 ---
 {jd}
 ---
 
-Format your output as valid JSON following this schema:
+Expected Output Format:
 {format_schema}
-"""
+""" 
 
 def _invoke_single_prompt(jd: str, format_schema: str, llm_instance=None) -> dict:
     if llm_instance is None:
@@ -28,7 +31,19 @@ def _invoke_single_prompt(jd: str, format_schema: str, llm_instance=None) -> dic
         response = llm_instance.invoke(prompt)
         if not response or not response.content:
             raise ValueError("Empty response from LLM")
-        return json.loads(response.content)
+
+        # DEBUG: Print the full LLM response
+        print("=== RAW LLM RESPONSE ===")
+        print(response.content)
+
+        # Clean and extract JSON using regex
+        json_text = response.content.strip()
+        match = re.search(r"\{[\s\S]*\}", json_text)
+        if not match:
+            raise ValueError("LLM response did not contain valid JSON.")
+        
+        return json.loads(match.group(0))
+
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON response from LLM: {e}")
     except Exception as e:

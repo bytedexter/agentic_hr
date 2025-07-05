@@ -1,216 +1,42 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Job Description Output Format Schema",
-  "description": "Schema for validating structured insights extracted from job descriptions.",
-  "type": "object",
-  "properties": {
-    "Relevance to Job Description": {
-      "type": "object",
-      "description": "Measures how well the candidate matches the job requirements.",
-      "properties": {
-        "Skill Match": {
-          "type": "object",
-          "description": "Skills required for the job.",
-          "properties": {
-            "Primary Skills": {
-              "type": "array",
-              "items": {"type": "string"},
-              "description": "List of primary/mandatory skills mentioned in the job description."
-            },
-            "Secondary Skills": {
-              "type": "array",
-              "items": {"type": "string"},
-              "description": "List of secondary or nice-to-have skills."
-            },
-            "Tools & Technologies": {
-              "type": "array",
-              "items": {"type": "string"},
-              "description": "Specific tools and technologies required for the job."
-            }
-          },
-          "required": ["Primary Skills", "Secondary Skills", "Tools & Technologies"]
-        },
-        "Experience Level": {
-          "type": "object",
-          "description": "Experience requirements for the job.",
-          "properties": {
-            "Years of Experience": {
-              "type": "array",
-              "items": {"type": "string"},
-              "description": "Years of experience required or preferred."
-            },
-            "Relevant Experience": {
-              "type": "array",
-              "items": {"type": "string"},
-              "description": "Relevant experience areas or domains."
-            }
-          },
-          "required": ["Years of Experience", "Relevant Experience"]
-        },
-        "Education and Certifications": {
-          "type": "object",
-          "description": "Educational background and certifications required.",
-          "properties": {
-            "Degree Requirements": {
-              "type": "array",
-              "items": {"type": "string"},
-              "description": "Degrees required (e.g., BSc, MSc, PhD)."
-            },
-            "Certifications": {
-              "type": "array",
-              "items": {"type": "string"},
-              "description": "Relevant certifications (e.g., PMP, AWS Certified)."
-            }
-          },
-          "required": ["Degree Requirements", "Certifications"]
-        },
-        "Job-Specific Achievements and Impact": {
-          "type": "object",
-          "description": "Achievements and impact relevant to the job.",
-          "properties": {
-            "Total Points": {
-              "type": "array",
-              "items": {"type": "number"},
-              "description": "Numerical scores or points assigned based on achievements. Clarify the scoring rubric in documentation."
-            }
-          },
-          "required": ["Total Points"]
-        }
-      },
-      "required": ["Skill Match", "Experience Level", "Education and Certifications", "Job-Specific Achievements and Impact"]
+  "Relevance to Job Description": {
+    "Skill Match": {
+      "Primary Skills": [],
+      "Secondary Skills": [],
+      "Tools & Technologies": []
     },
-    "Market-Driven Parameters": {
-      "type": "object",
-      "description": "Parameters influenced by market trends and company culture.",
-      "properties": {
-        "Cultural Fit": {
-          "type": "object",
-          "properties": {
-            "Company Values Match": {
-              "type": "array",
-              "items": {"type": "string"},
-              "description": "How well the candidate aligns with company values."
-            }
-          },
-          "required": ["Company Values Match"]
-        },
-        "Job Mobility and Stability": {
-          "type": "object",
-          "properties": {
-            "Job-Hopping Patterns": {
-              "type": "array",
-              "items": {"type": "string"},
-              "description": "Patterns of frequent job changes."
-            },
-            "Gap in Experience": {
-              "type": "array",
-              "items": {"type": "string"},
-              "description": "Any significant gaps in employment history."
-            }
-          },
-          "required": ["Job-Hopping Patterns", "Gap in Experience"]
-        }
-      },
-      "required": ["Cultural Fit", "Job Mobility and Stability"]
+    "Experience Level": {
+      "Years of Experience": [],
+      "Relevant Experience": []
     },
-    "Other Screening Considerations": {
-      "type": "object",
-      "description": "Additional factors for screening candidates.",
-      "properties": {
-        "Resume Presentation Quality": {
-          "type": "object",
-          "properties": {
-            "Readability and Format": {
-              "type": "array",
-              "items": {"type": "string"},
-              "description": "Assessment of resume readability and formatting."
-            },
-            "Grammar and Spelling": {
-              "type": "array",
-              "items": {"type": "string"},
-              "description": "Assessment of grammar and spelling in the resume."
-            }
-          },
-          "required": ["Readability and Format", "Grammar and Spelling"]
-        },
-        "Geographic and Remote Work Flexibility": {
-          "type": "object",
-          "properties": {
-            "Location Proximity": {
-              "type": "array",
-              "items": {"type": "string"},
-              "description": "Proximity of candidate's location to the job site."
-            },
-            "Remote Work Experience": {
-              "type": "array",
-              "items": {"type": "string"},
-              "description": "Experience with remote work."
-            }
-          },
-          "required": ["Location Proximity", "Remote Work Experience"]
-        },
-        "Additional Activities and Interests": {
-          "type": "object",
-          "properties": {
-            "Total Points": {
-              "type": "array",
-              "items": {"type": "number"},
-              "description": "Numerical points for additional activities/interests. Clarify scoring in documentation."
-            }
-          },
-          "required": ["Total Points"]
-        }
-      },
-      "required": ["Resume Presentation Quality", "Geographic and Remote Work Flexibility", "Additional Activities and Interests"]
+    "Education and Certifications": {
+      "Degree Requirements": [],
+      "Certifications": []
+    },
+    "Job-Specific Achievements and Impact": {
+      "Total Points": []
     }
   },
-  "required": [
-    "Relevance to Job Description",
-    "Market-Driven Parameters",
-    "Other Screening Considerations"
-  ],
-  "examples": [
-    {
-      "Relevance to Job Description": {
-        "Skill Match": {
-          "Primary Skills": ["Python", "Data Analysis"],
-          "Secondary Skills": ["Machine Learning"],
-          "Tools & Technologies": ["Pandas", "NumPy"]
-        },
-        "Experience Level": {
-          "Years of Experience": ["3-5 years"],
-          "Relevant Experience": ["Analytics", "HR"]
-        },
-        "Education and Certifications": {
-          "Degree Requirements": ["BSc Computer Science"],
-          "Certifications": ["PMP"]
-        },
-        "Job-Specific Achievements and Impact": {
-          "Total Points": [8.5]
-        }
-      },
-      "Market-Driven Parameters": {
-        "Cultural Fit": {
-          "Company Values Match": ["Innovation", "Integrity"]
-        },
-        "Job Mobility and Stability": {
-          "Job-Hopping Patterns": ["None"],
-          "Gap in Experience": ["None"]
-        }
-      },
-      "Other Screening Considerations": {
-        "Resume Presentation Quality": {
-          "Readability and Format": ["Good"],
-          "Grammar and Spelling": ["Excellent"]
-        },
-        "Geographic and Remote Work Flexibility": {
-          "Location Proximity": ["Remote"],
-          "Remote Work Experience": ["2 years"]
-        },
-        "Additional Activities and Interests": {
-          "Total Points": [2.0]
-        }
-      }
+  "Market-Driven Parameters": {
+    "Cultural Fit": {
+      "Company Values Match": []
+    },
+    "Job Mobility and Stability": {
+      "Job-Hopping Patterns": [],
+      "Gap in Experience": []
     }
-  ]
+  },
+  "Other Screening Considerations": {
+    "Resume Presentation Quality": {
+      "Readability and Format": [],
+      "Grammar and Spelling": []
+    },
+    "Geographic and Remote Work Flexibility": {
+      "Location Proximity": [],
+      "Remote Work Experience": []
+    },
+    "Additional Activities and Interests": {
+      "Total Points": []
+    }
+  }
 }
