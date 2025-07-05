@@ -1,4 +1,7 @@
-from .util.llm_factory import LLMFactory
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
+from util.llm_factory import LLMFactory
 from langchain.prompts import ChatPromptTemplate
 from concurrent.futures import ThreadPoolExecutor
 import json
