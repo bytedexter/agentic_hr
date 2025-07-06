@@ -50,10 +50,6 @@ uploads/
 CVList/processed/
 
 performance_ copy.py
-<<<<<<< HEAD
-HR_Analytics.docx
 __pycache__/
 __init__.py
-=======
 HR_Analytics.docx
->>>>>>> temp_recovery
