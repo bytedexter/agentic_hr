@@ -1,6 +1,5 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional, Dict, Any, List
-# Request Classes
+from typing import Optional, Dict, Any# Request Classes
 
 
 class GenerateContentRequest(BaseModel):

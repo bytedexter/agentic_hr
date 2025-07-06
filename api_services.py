@@ -7,9 +7,8 @@ import json
 import re
 import logging
 
-def scan_job_description(jd: str, count: int, config_path: str) -> dict:
+def scan_job_description(jd: str, config_path: str, count: int = 3) -> dict:
     # Use the provided config_path, fallback to default if None
-    count=3
     try:
         with open(config_path, 'r') as f:
             format_schema = f.read()
@@ -48,8 +47,12 @@ api_router = APIRouter(tags=["HR API Services"])
 async def generate_content(request: GenerateContentRequest) -> GenerateContentResponse:
     try:
         logger.info("Generating content with Job Description")
-        summary = invoke_llm_with_reflection(request.job_description, request.config_file_path)
-
+        # Use scan_job_description to ensure aggregation logic is applied
+        summary = scan_job_description(
+            jd=request.job_description,
+            config_path=request.config_file_path,
+            count=getattr(request, 'llm_reflection_count', 3)  # fallback to 3 if not present
+        )
         return GenerateContentResponse(
             status="success", message="Content generated successfully", data=summary
         )

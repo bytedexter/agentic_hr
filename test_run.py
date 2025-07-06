@@ -1,3 +1,11 @@
+"""
+LLM Reflection and Aggregation Module
+
+This module provides functionality for invoking language models with a reflection-based
+approach, running multiple parallel reflections and aggregating their outputs.
+Used for job description scanning and analysis.
+"""
+
 import json
 import re
 from typing import List, Dict, Any
@@ -8,44 +16,69 @@ from util.system_prompt import prompt_generate_summary, agg_prompt
 from langchain.schema.runnable import RunnableParallel, RunnableLambda
 from langchain_core.runnables import Runnable
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 def _extract_valid_json(raw_text: str) -> Dict[str, Any]:
     """Extract valid JSON from LLM output."""
     match = re.search(r"\{[\s\S]*\}", raw_text.strip())
     if not match:
-        raise ValueError("No JSON object found in LLM response.")
+        logger.error("No valid JSON found in LLM output.")
+        raise ValueError("No valid JSON found in LLM output.")
     try:
         return json.loads(match.group(0))
     except json.JSONDecodeError as e:
-        raise ValueError(f"Failed to decode JSON from LLM response: {e}")
+        logger.error(f"Failed to parse JSON: {e}")
+        raise ValueError(f"Failed to parse JSON: {e}")
 
 
-def build_reflection_chain(jd: str, format_schema: str) -> Runnable:
+def build_reflection_chain(
+    jd: str,
+    format_schema: str,
+    temperature: float = 0.2,
+    local_llm: bool = False
+) -> Runnable:
     """Return a Runnable chain for a single reflection."""
-    llm = LLMFactory.create_llm_instance(temperature=0.2, local_llm=False)
+    llm = LLMFactory.create_llm_instance(
+        temperature=temperature,
+        local_llm=local_llm
+    )
 
-    def run_prompt(_):
+    def run_prompt(_) -> Dict[str, Any]:
         prompt = ChatPromptTemplate.from_template(prompt_generate_summary).format(
-            jd=jd, format_schema=format_schema
+            jd=jd,
+            format_schema=format_schema
         )
-        response = llm.invoke(prompt)
-        print("=== RAW LLM RESPONSE ===")
-        print(response.content)
-        return _extract_valid_json(response.content)
+        try:
+            response = llm.invoke(prompt)
+            logger.debug("Raw LLM response: %s", response.content)
+            return _extract_valid_json(response.content)
+        except Exception as e:
+            logger.error("Failed to invoke LLM: %s", e)
+            raise
 
     return RunnableLambda(run_prompt)
 
 
-def build_aggregation_chain(reflections: List[Dict[str, Any]]) -> Dict[str, Any]:
+def build_aggregation_chain(
+    reflections: List[Dict[str, Any]],
+    temperature: float = 0.2,
+    local_llm: bool = False,
+) -> Dict[str, Any]:
     """Aggregate multiple reflected outputs into one using a final LLM call."""
-    llm = LLMFactory.create_llm_instance(temperature=0.2, local_llm=False)
-    prompt = ChatPromptTemplate.from_template(agg_prompt).format(
-        reflected_outputs=json.dumps(reflections, indent=2)
-    )
-    response = llm.invoke(prompt)
-    print("=== AGGREGATION OUTPUT ===")
-    print(response.content)
-    return _extract_valid_json(response.content)
+    llm = LLMFactory.create_llm_instance(temperature=temperature, local_llm=local_llm)
+    try:
+        prompt = ChatPromptTemplate.from_template(agg_prompt).format(
+            reflected_outputs=json.dumps(reflections, indent=2)
+        )
+        response = llm.invoke(prompt)
+        logger.debug("Aggregation output: %s", response.content)
+        return _extract_valid_json(response.content)
+    except Exception as e:
+        logger.error("Failed to aggregate reflections: %s", e)
+        raise
 
 
 def invoke_llm_with_reflection(jd: str, format_schema: str) -> Dict[str, Any]:

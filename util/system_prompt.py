@@ -1,6 +1,3 @@
-from typing_extensions import Final
-
-
 generate_goals_prompt = (
     "As the manager for the {role} position, generate exactly 3 clear, concise, and measurable performance goals. "
     "Keep them relevant to core responsibilities. Return only bullet points, no intro or explanation."
