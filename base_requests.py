@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional, Dict, Any# Request Classes
+from typing import Optional, Dict, Any
 
-
+# Request Classes
 class GenerateContentRequest(BaseModel):
     """Request model for generating Job Description content."""
 
@@ -20,8 +20,6 @@ class GenerateContentRequest(BaseModel):
 
 
 # Response Classes
-
-
 class GenerateContentResponse(BaseModel):
     """Response model for job description generation."""
 
