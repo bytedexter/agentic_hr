@@ -66,6 +66,7 @@ class LLMFactory:
         """
         Creates and returns an instance of the appropriate LLM.
         """
+        load_dotenv(override=True)
         if local_llm:
             # If local_llm is True, use the local LLM instance.
             return ChatOllama(
@@ -120,6 +121,3 @@ class LLMFactory:
 
         else:
             raise ValueError("At least a human_message must be provided.")
-        
-        
-        

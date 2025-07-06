@@ -10,7 +10,6 @@ from googleapiclient.discovery import build
 from langsmith import traceable
 from typing_extensions import Annotated
 import re
-from google.auth.transport.requests import Request
 from util.llm_factory import LLMFactory
 from util.system_prompt import (
     report_generation_prompt, feedback_prompt, acknowledgment_prompt, generate_goals_prompt

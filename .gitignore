@@ -1,4 +1,21 @@
+<<<<<<< HEAD
 # --- Python ---
+=======
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class# --- Python ---
+>>>>>>> temp_recovery
 __pycache__/
 
 
@@ -33,6 +50,10 @@ uploads/
 CVList/processed/
 
 performance_ copy.py
+<<<<<<< HEAD
 HR_Analytics.docx
 __pycache__/
 __init__.py
+=======
+HR_Analytics.docx
+>>>>>>> temp_recovery
