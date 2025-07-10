@@ -3,6 +3,7 @@ from fastapi.responses import FileResponse
 import logging
 from base_requests import GenerateContentRequest, GenerateContentResponse
 from test_run import generate_job_description
+from util.utility import Utility
 from docx import Document
 import os
 import uuid
@@ -30,6 +31,7 @@ async def generate_content(request: GenerateContentRequest):
 
         input_data = request.model_dump()
         job_description = generate_job_description(**input_data)
+        job_description = Utility.clean_text(job_description, preserve_paragraphs=True)
 
         if not job_description:
             raise HTTPException(status_code=500, detail="Failed to generate job description")
