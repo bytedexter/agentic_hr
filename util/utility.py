@@ -1,5 +1,7 @@
 import os
 import sys
+import re
+import unicodedata
 
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(root_dir)
@@ -58,3 +60,40 @@ class Utility:
             raise ValueError(f"Unsupported file type: {extension}")
 
         return documents
+    
+    @staticmethod
+    def clean_text(content: str, preserve_paragraphs: bool = False) -> str:
+        """
+        Cleans and normalizes text by removing control characters, normalizing Unicode,
+        standardizing whitespace, and optionally preserving paragraph breaks.
+
+        Args:
+            content (str): The input text to clean.
+            preserve_paragraphs (bool): If True, paragraph breaks (\n\n) are preserved.
+                                        If False, all whitespace is flattened.
+
+        Returns:
+            str: The cleaned and normalized text.
+        """
+        # Remove control characters and zero-width spaces
+        content = re.sub(r"[\x00-\x09\x0B-\x1F\x7F-\x9F\u200B\uFEFF]", "", content)
+
+        # Unicode normalization
+        content = unicodedata.normalize("NFKD", content)
+
+        # Remove markdown symbols
+        markdown_chars = r"[\\*_`~#>\[\]!\(\)\-]"  # Add more if needed
+        content = re.sub(markdown_chars, "", content)
+
+        if preserve_paragraphs:
+            # Normalize paragraph breaks
+            content = re.sub(
+                r"\n\s*\n", "\n\n", content
+            )  # Clean and standardize paragraph breaks
+            content = re.sub(r"[ \t]+", " ", content)  # Collapse internal spaces/tabs
+            content = re.sub(r" *\n *", "\n", content)  # Clean space around newlines
+        else:
+            # Flatten all whitespace into single spaces
+            content = re.sub(r"\s+", " ", content)
+
+        return content.strip()
