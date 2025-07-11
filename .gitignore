@@ -1,3 +1,5 @@
+
+# --- Python ---
 # Environments
 .env
 .venv
@@ -15,6 +17,7 @@ __pycache__/
 
 generated_docs/
 # --- Python ---
+*$py.class# --- Python ---
 __pycache__/
 
 
@@ -47,3 +50,10 @@ output/
 reports/
 uploads/
 CVList/processed/
+*.doc
+*.docx
+
+performance_ copy.py
+__pycache__/
+__init__.py
+# --- Documents ---
