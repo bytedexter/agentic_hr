@@ -13,7 +13,7 @@ from typing import List, Dict, Any
 from util.llm_factory import LLMFactory, ChatPromptTemplate
 from util.system_prompt import prompt_generate_summary, agg_prompt
 
-from langchain.schema.runnable import RunnableParallel, RunnableLambda
+from langchain.schema.runnable import RunnableLambda
 from langchain_core.runnables import Runnable
 
 import logging
@@ -88,19 +88,14 @@ def invoke_llm_with_reflection(jd: str, format_schema: str) -> Dict[str, Any]:
     if not format_schema or not format_schema.strip():
         raise ValueError("Format schema cannot be empty")
 
-    reflection_chains = RunnableParallel(
-        r1=build_reflection_chain(jd, format_schema),
-        r2=build_reflection_chain(jd, format_schema),
-        r3=build_reflection_chain(jd, format_schema)
-    )
-
-    print("=== INVOKING LLM REFLECTION PARALLEL ===")
-    results: Dict[str, Any] = reflection_chains.invoke({})
-    reflections: List[Dict[str, Any]] = [results["r1"], results["r2"], results["r3"]]
-
-    print("=== RAW REFLECTED OUTPUTS ===")
-    for i, ref in enumerate(reflections, 1):
-        print(f"\n--- Reflection #{i} ---\n{json.dumps(ref, indent=2)}")
+    # Run 3 reflection chains in a loop
+    reflections: List[Dict[str, Any]] = []
+    for i in range(3):
+        print(f"=== INVOKING LLM REFLECTION #{i+1} ===")
+        chain = build_reflection_chain(jd, format_schema)
+        result = chain.invoke({})
+        print(f"\n--- Reflection #{i+1} ---\n{json.dumps(result, indent=2)}")
+        reflections.append(result)
 
     # Step 2: Aggregate the outputs
     aggregated_result = build_aggregation_chain(reflections)
