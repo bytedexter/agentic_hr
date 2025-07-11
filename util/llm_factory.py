@@ -18,7 +18,6 @@ from langchain.prompts import (
 
 import util.constants as constants
 
-
 class LLMFactory:
 
     @staticmethod
@@ -97,7 +96,7 @@ class LLMFactory:
         system_prompt: str = None,
         human_message: str = None,
         temperature=0.3,
-        local_llm=False,
+        local_llm=False
     ):
         """
         Invokes the LLM with given prompts using ChatPromptTemplate.
