@@ -14,3 +14,36 @@ __pycache__/
 *$py.class
 
 generated_docs/
+# --- Python ---
+__pycache__/
+
+
+# Virtual Environment
+env/
+venv/
+.venv/
+ENV/
+.ENV/
+
+# --- IDEs ---
+.vscode/
+.idea/
+
+# --- Environment Variables ---
+.env
+.env.*
+
+# --- Token / Secrets / Credentials ---
+token.json
+credentials.json
+
+# --- LangChain / LangGraph artifacts ---
+graph.png
+
+# --- Output / Generated Files ---
+*.pdf
+*.csv
+output/
+reports/
+uploads/
+CVList/processed/

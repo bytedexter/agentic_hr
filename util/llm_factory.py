@@ -18,7 +18,6 @@ from langchain.prompts import (
 
 import util.constants as constants
 
-
 class LLMFactory:
 
     @staticmethod
